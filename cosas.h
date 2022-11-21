@@ -180,33 +180,34 @@ public:
         txtRuta->Text += "\n";
         cout << est[i].getNombre() << " -> ";
     }
-    void heapify(vector<Estacion> est, int n, int i)
+    void heapify(vector<Estacion>* est, int n, int i)
     {
-        int largest = i; 
-        int l = 2 * i + 1; 
-        int r = 2 * i + 2; 
-        if (l < n && indexByName(est[l].getNombre()) < indexByName( est[largest].getNombre()))
+        int largest = i;
+        int l = 2 * i + 1;
+        int r = 2 * i + 2;
+        if (l < n && indexByName(est->at(l).getNombre()) < indexByName(est->at(largest).getNombre()))
             largest = l;
-        if (r < n && indexByName(est[r].getNombre()) < indexByName(est[largest].getNombre()))
+        if (r < n && indexByName(est->at(r).getNombre()) < indexByName(est->at(largest).getNombre()))
             largest = r;
         if (largest != i) {
-            Estacion aux = est[i];
-            est[i] = est[largest];
-            est[largest] = aux;
+            Estacion aux = est->at(i);
+            est->at(i) = est->at(largest);
+            est->at(largest) = aux;
             heapify(est, n, largest);
         }
     }
     vector<Estacion> sort(vector<Estacion> _est) {
-        vector<Estacion> est=_est;
-        for (int i = est.size() / 2 - 1; i >= 0; i--)
-            heapify(est, est.size(), i);
-        for (int i = est.size() - 1; i >= 0; i--) {
-            Estacion aux = est[0];
-            est[0] = est[i];
-            est[i] = aux;
+        vector<Estacion>* est = new vector<Estacion>(_est);
+
+        for (int i = est->size() / 2 - 1; i >= 0; i--)
+            heapify(est, est->size(), i);
+        for (int i = est->size() - 1; i >= 0; i--) {
+            Estacion aux = est->at(0);
+            est->at(0) = est->at(i);
+            est->at(i) = aux;
             heapify(est, i, 0);
         }
-        return est;
+        return *est;
     }
     vector<vector<long double>> deleteVertex(vector<vector<long double>> matrix, int vertex, int* s, int* t) {
         vector<vector<long double>> m = matrix;
