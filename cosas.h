@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <list>
 using namespace std;
 
 using namespace System;
@@ -42,8 +43,7 @@ public:
 class GrafoEstaciones {
     vector<vector<long double>> matriz;
     vector<Estacion> estaciones;
-    int s;
-    int t;
+    vector<Estacion> deletedEstaciones;
 public:
     GrafoEstaciones() {
     }
@@ -135,11 +135,11 @@ public:
             y = (720 - estaciones[i].getX() * 24 * 1.962618)+2455;
             puntos.push_back(pair<int, int>(x, y));
             if (i == cbPartida->SelectedIndex)
-                canvas->FillEllipse(Brushes::Red,x, y, 5, 5);
+                canvas->FillEllipse(Brushes::Red,x-4, y-4, 8, 8);
             else if (i == cbDestino->SelectedIndex)
-                canvas->FillEllipse(Brushes::Blue,x, y, 5, 5);
+                canvas->FillEllipse(Brushes::Blue,x-4, y-4, 8, 8);
             else
-                canvas->DrawEllipse(Pens::Black,x, y, 5, 5);
+                canvas->DrawEllipse(Pens::Black,x-4, y-4, 8, 8);
             
         }
         for (int i = 0; i < matriz.size(); i++)
@@ -152,10 +152,11 @@ public:
             }
         }
     }
-    void actualizarCombobox(ComboBox^ cbPartida, ComboBox^ cbDestino) {
+    void actualizarCombobox(ComboBox^ cbPartida, ComboBox^ cbDestino, ComboBox^ cbEstacionesND) {
         for (int i = 0; i < estaciones.size(); i++) {
             cbPartida->Items->Add(to_String(estaciones[i].getNombre()));
-            cbDestino->Items->Add(to_String( estaciones[i].getNombre()));
+            cbDestino->Items->Add(to_String(estaciones[i].getNombre()));
+            cbEstacionesND->Items->Add(to_String( estaciones[i].getNombre()));
         }
     }
     int distancia_minima(vector<float> distancias, vector<bool> pasos) {
@@ -169,26 +170,157 @@ public:
         }
         return index;
     }
-    void dijkstra(ComboBox^ cbPartida) {
-        vector<float> distancias;
-        vector<bool> pasos;
-        for (int i = 0; i < estaciones.size(); i++) {
-            distancias.push_back(999999999.0f);
-            pasos.push_back(false);
+    void printPath(int i, vector<int> parents, RichTextBox^ txtRuta, vector<Estacion> est)
+    {
+        if (i == -1) {
+            return;
         }
-        distancias[cbPartida->SelectedIndex] = 0;
-
-        for (int i = 0; i < estaciones.size()-1; i++) {
-            int x = distancia_minima(distancias, pasos);
-            pasos[x] = true;
-            for (int j = 0; j < estaciones.size(); j++) {
-                if (!pasos[j] && matriz[x][j] && distancias[x] != 999999999.0f && distancias[x] + matriz[x][j] < distancias[j])
-                    distancias[j] = distancias[x] + matriz[x][j];
+        printPath(parents[i], parents, txtRuta, est);
+        txtRuta->Text += to_String(est[i].getNombre());
+        txtRuta->Text += "\n";
+        cout << est[i].getNombre() << " -> ";
+    }
+    void heapify(vector<Estacion> est, int n, int i)
+    {
+        int largest = i; 
+        int l = 2 * i + 1; 
+        int r = 2 * i + 2; 
+        if (l < n && indexByName(est[l].getNombre()) < indexByName( est[largest].getNombre()))
+            largest = l;
+        if (r < n && indexByName(est[r].getNombre()) < indexByName(est[largest].getNombre()))
+            largest = r;
+        if (largest != i) {
+            Estacion aux = est[i];
+            est[i] = est[largest];
+            est[largest] = aux;
+            heapify(est, n, largest);
+        }
+    }
+    vector<Estacion> sort(vector<Estacion> _est) {
+        vector<Estacion> est=_est;
+        for (int i = est.size() / 2 - 1; i >= 0; i--)
+            heapify(est, est.size(), i);
+        for (int i = est.size() - 1; i >= 0; i--) {
+            Estacion aux = est[0];
+            est[0] = est[i];
+            est[i] = aux;
+            heapify(est, i, 0);
+        }
+        return est;
+    }
+    vector<vector<long double>> deleteVertex(vector<vector<long double>> matrix, int vertex, int* s, int* t) {
+        vector<vector<long double>> m = matrix;
+        if (vertex > m.size()) {
+            return m;
+        }
+        else {
+            m.erase(m.begin() + vertex);
+            for (int i = 0; i < m.size(); i++) {
+                m[i].erase(m[i].begin() + vertex);
+            }
+            if (*s >= vertex) {
+                s -= 1;
+            }
+            if (*t >= vertex) {
+                t -= 1;
             }
         }
-        cout << "Estacion      Tiempo en minutos de la estacion" << endl;
-        for (int i = 0; i < estaciones.size();i++) {
-            cout << estaciones[i].getNombre() << "    " << distancias[i]<<endl;
+        return m;
+    }
+    bool existPath(vector<vector<long double>> matrix, int s, int t)
+    {
+        vector<vector<bool>> mat;
+        for (int i = 0; i < matrix.size(); i++) {
+            mat.push_back(vector<bool>());
+            for (int j = 0; j < matrix.size(); j++) {
+                mat[i].push_back(false);
+            }
+        }
+        for (int i = 0; i < matrix.size(); i++) {
+            for (int j = 0; j < matrix.size(); j++) {
+                if(matrix[i][j]>0)
+                    mat[i][j] = true;
+            }
+        }
+        for (int k = 0; k < matrix.size(); k++) {
+            for (int i = 0; i < matrix.size(); i++) {
+                for (int j = 0; j < matrix.size(); j++) {
+                    mat[i][j] = mat[i][j] || mat[i][k] && mat[k][j];
+                }
+            }
+        }
+        if (s >= matrix.size() || t >= matrix.size()) {
+            return false;
+        }
+        if (mat[s][t])
+            return true;
+        return false;
+    }
+    void dijkstra2(ComboBox^ cbPartida, ComboBox^ cbDestino, RichTextBox^ txtRuta, Label^ tiempo) {
+        int* s = new int(cbPartida->SelectedIndex);
+        int* t =new int (cbDestino->SelectedIndex);
+        if (s < 0 || t < 0)
+            return;
+        txtRuta->Text = "";
+        vector<vector<long double>> matrix = matriz;
+        vector<Estacion> est = estaciones;
+        deletedEstaciones = sort(deletedEstaciones);
+        for (int i = 0; i < deletedEstaciones.size(); i++) {
+            matrix = deleteVertex(matrix, indexByName(deletedEstaciones[i].getNombre()),s,t);
+        }
+        int nVertices = matrix[0].size();
+        vector<int> shortestDistances(nVertices);
+        vector<bool> added(nVertices);
+        if (!existPath(matrix, *s, *t)) {
+            tiempo->Text = "No existe un camino";
+            return;
+        }
+
+        for (int i = 0; i < nVertices; i++) {
+            shortestDistances[i] = INT_MAX;
+            added[i] = false;
+        }
+
+        shortestDistances[*s] = 0;
+        vector<int> parents(nVertices);
+        parents[*s] = -1;
+        for (int i = 1; i < nVertices; i++) {
+            int nearestVertex = -1;
+            int shortestDistance = INT_MAX;
+            for (int j = 0; j < nVertices; j++) {
+                if (!added[j] && shortestDistances[j] < shortestDistance) {
+                    nearestVertex = j;
+                    shortestDistance = shortestDistances[j];
+                }
+            }
+            added[nearestVertex] = true;
+            for (int j = 0; j < nVertices; j++) {
+                int edgeDistance = matrix[nearestVertex][j];
+                if (edgeDistance > 0 && ((shortestDistance + edgeDistance) < shortestDistances[j])) {
+                    parents[j] = nearestVertex;
+                    shortestDistances[j] = shortestDistance + edgeDistance;
+                }
+            }
+        }
+
+        tiempo->Text = "";
+        tiempo->Text += shortestDistances[*t];
+        tiempo->Text += " min";
+        for (int vertexIndex = 0; vertexIndex < nVertices; vertexIndex++) {
+            if (vertexIndex == *t) {
+                cout << "\n" << est.at(*s).getNombre() << " -> ";
+                cout << est.at(vertexIndex).getNombre() << " \t\t ";
+                cout << shortestDistances[vertexIndex] << endl;
+                printPath(vertexIndex, parents, txtRuta, est);
+            }
+        }
+    }
+    void eliminarEstacion(ComboBox^ cbEstacionesND, RichTextBox^ txtRuta) {
+        deletedEstaciones.push_back(Estacion(to_string(cbEstacionesND->Text)));
+        txtRuta->Text = "";
+        for (int i = 0; i < deletedEstaciones.size(); i++) {
+            txtRuta->Text += to_String(deletedEstaciones[i].getNombre());
+            txtRuta->Text += "\n";
         }
     }
 };
